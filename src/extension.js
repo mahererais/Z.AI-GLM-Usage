@@ -351,7 +351,7 @@ class ZaiUsageIndicator extends PanelMenu.Button {
         // ---- panel button ----
         const box = new St.BoxLayout({style_class: 'zu-panel'});
         this._panelIcon = new St.Icon({
-            gicon: Gio.icon_new_for_string(`${path}/icons/glm-spark.svg`),
+            gicon: Gio.icon_new_for_string(`${path}/icons/zai-logo.svg`),
             style_class: 'zu-panel-icon',
             y_align: Clutter.ActorAlign.CENTER,
         });
@@ -435,7 +435,7 @@ class ZaiUsageIndicator extends PanelMenu.Button {
         // header
         const header = new St.BoxLayout({style_class: 'zu-header'});
         const logo = new St.Icon({
-            gicon: Gio.icon_new_for_string(`${this._path}/icons/glm-logo.svg`),
+            gicon: Gio.icon_new_for_string(`${this._path}/icons/zai-logo.svg`),
             style_class: 'zu-logo',
             y_align: Clutter.ActorAlign.CENTER,
         });

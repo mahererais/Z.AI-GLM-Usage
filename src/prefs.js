@@ -39,15 +39,25 @@ export default class ZaiUsagePreferences extends ExtensionPreferences {
         group.add(ctx.statusRow);
 
         const keyEntry = new Adw.PasswordEntryRow({title: 'Set Z.ai API key'});
-        keyEntry.connect('apply', () => {
+        keyEntry.set_show_apply_button(true);
+
+        // Saves the typed key (Enter or the row's apply button), plus the
+        // explicit "Save API key" button row below — there is no auto-save.
+        const saveKey = () => {
             const v = (keyEntry.text ?? '').trim();
-            if (v)
-                settings.set_string('api-key', v);
             keyEntry.text = '';
-            this._refreshStatus(ctx);
+            if (!v)
+                return;
+            settings.set_string('api-key', v);
+            ctx.statusRow.subtitle = 'Key saved — testing connection…';
             this._testConnection(ctx);
-        });
+        };
+        keyEntry.connect('apply', saveKey);
+
+        const saveRow = new Adw.ButtonRow({title: 'Save API key'});
+        saveRow.connect('activated', saveKey);
         group.add(keyEntry);
+        group.add(saveRow);
 
         const envRow = new Adw.SwitchRow({
             title: `Use $${ENV_KEY} environment variable`,
@@ -68,7 +78,8 @@ export default class ZaiUsagePreferences extends ExtensionPreferences {
         group.add(clearRow);
 
         const labelRow = new Adw.EntryRow({title: 'Panel label'});
-        group.add(settings.bind('plan-label', labelRow, 'text', Gio.SettingsBindFlags.DEFAULT));
+        settings.bind('plan-label', labelRow, 'text', Gio.SettingsBindFlags.DEFAULT);
+        group.add(labelRow);
 
         const helpRow = new Adw.ActionRow({
             title: 'Where do I get an API key?',
@@ -91,8 +102,9 @@ export default class ZaiUsagePreferences extends ExtensionPreferences {
         const group = new Adw.PreferencesGroup({title: 'Panel'});
         page.add(group);
 
-        group.add(settings.bind('show-icon',
-            new Adw.SwitchRow({title: 'Show icon'}), 'active', Gio.SettingsBindFlags.DEFAULT));
+        const iconRow = new Adw.SwitchRow({title: 'Show icon'});
+        settings.bind('show-icon', iconRow, 'active', Gio.SettingsBindFlags.DEFAULT);
+        group.add(iconRow);
 
         const gaugeModel = new Gtk.StringList();
         gaugeModel.append('Ring'); gaugeModel.append('Bar'); gaugeModel.append('None');
@@ -107,12 +119,15 @@ export default class ZaiUsagePreferences extends ExtensionPreferences {
             settings.set_string('panel-gauge', map[gaugeRow.selected] ?? 'ring'));
         group.add(gaugeRow);
 
-        group.add(settings.bind('show-percentage',
-            new Adw.SwitchRow({title: 'Show percentage'}), 'active', Gio.SettingsBindFlags.DEFAULT));
-        group.add(settings.bind('show-reset',
-            new Adw.SwitchRow({title: 'Show time until reset'}), 'active', Gio.SettingsBindFlags.DEFAULT));
-        group.add(settings.bind('show-remaining',
-            new Adw.SwitchRow({title: 'Show remaining instead of used'}), 'active', Gio.SettingsBindFlags.DEFAULT));
+        const pctRow = new Adw.SwitchRow({title: 'Show percentage'});
+        settings.bind('show-percentage', pctRow, 'active', Gio.SettingsBindFlags.DEFAULT);
+        group.add(pctRow);
+        const resetRow = new Adw.SwitchRow({title: 'Show time until reset'});
+        settings.bind('show-reset', resetRow, 'active', Gio.SettingsBindFlags.DEFAULT);
+        group.add(resetRow);
+        const remRow = new Adw.SwitchRow({title: 'Show remaining instead of used'});
+        settings.bind('show-remaining', remRow, 'active', Gio.SettingsBindFlags.DEFAULT);
+        group.add(remRow);
     }
 
     _buildAdvanced(page, settings) {
@@ -124,7 +139,8 @@ export default class ZaiUsagePreferences extends ExtensionPreferences {
             subtitle: 'How often to poll Z.ai for updated usage.',
             adjustment: new Gtk.Adjustment({lower: 30, upper: 600, step_increment: 15, page_increment: 60}),
         });
-        group.add(settings.bind('poll-seconds', poll, 'value', Gio.SettingsBindFlags.DEFAULT));
+        settings.bind('poll-seconds', poll, 'value', Gio.SettingsBindFlags.DEFAULT);
+        group.add(poll);
 
         const win = new Adw.SpinRow({
             title: 'Quota window length (hours)',
@@ -132,7 +148,8 @@ export default class ZaiUsagePreferences extends ExtensionPreferences {
             adjustment: new Gtk.Adjustment({lower: 1, upper: 168, step_increment: 1, page_increment: 24}),
             digits: 1,
         });
-        group.add(settings.bind('window-hours', win, 'value', Gio.SettingsBindFlags.DEFAULT));
+        settings.bind('window-hours', win, 'value', Gio.SettingsBindFlags.DEFAULT);
+        group.add(win);
     }
 
     _keyStatusText(settings) {
