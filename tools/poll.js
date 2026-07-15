@@ -1,21 +1,18 @@
 #!/usr/bin/env -S gjs -m
-// Standalone validator for the Z.ai usage client. Run from the repo root:
-//   ZAI_API_KEY=... gjs -m tools/poll.js
-// or
-//   gjs -m tools/poll.js <api-key>
-import GLib from 'gi://GLib';
+// Standalone validator for the Z.ai usage client. It reads GNOME Keyring first,
+// then an inherited ZAI_API_KEY. It deliberately rejects command-line secrets.
 import system from 'system';
 
 import {ZaiClient, resolveApiKey} from '../src/lib/zaiClient.js';
 
-// Allow passing the key as the first CLI arg for convenience.
-const arg = ARGV?.[0];
-if (arg)
-    GLib.setenv('ZAI_API_KEY', arg, true);
+if (ARGV?.length) {
+    printerr('Refusing command-line arguments: API keys can leak through process lists and shell history.');
+    system.exit(2);
+}
 
-const key = resolveApiKey(null);
+const key = await resolveApiKey(null);
 if (!key) {
-    printerr('No API key. Set ZAI_API_KEY or pass one as an argument.');
+    printerr('No API key in GNOME Keyring or ZAI_API_KEY. Configure the extension first.');
     system.exit(1);
 }
 
@@ -25,7 +22,5 @@ try {
     print(JSON.stringify(usage, null, 2));
 } catch (e) {
     printerr(`Failed: ${e.message ?? e}`);
-    if (e.body)
-        printerr(`Body: ${e.body}`);
     system.exit(1);
 }

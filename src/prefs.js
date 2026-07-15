@@ -4,7 +4,15 @@ import Gio from 'gi://Gio';
 
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
-import {resolveApiKey, ZaiClient} from './lib/zaiClient.js';
+import {ZaiClient} from './lib/zaiClient.js';
+import {
+    bumpCredentialGeneration,
+    clearApiKey,
+    lookupStoredApiKey,
+    migrateLegacyApiKey,
+    resolveApiKey,
+    storeApiKey,
+} from './lib/secretStore.js';
 import {ENV_KEY} from './lib/config.js';
 
 export default class ZaiUsagePreferences extends ExtensionPreferences {
@@ -27,13 +35,13 @@ export default class ZaiUsagePreferences extends ExtensionPreferences {
         const {settings} = ctx;
         const group = new Adw.PreferencesGroup({
             title: 'Account',
-            description: 'Your Z.ai API key is stored locally by GNOME and never leaves this machine.',
+            description: 'Your API key is protected by GNOME Keyring and sent only to api.z.ai for usage queries.',
         });
         page.add(group);
 
         ctx.statusRow = new Adw.ActionRow({
             title: 'API key',
-            subtitle: this._keyStatusText(settings),
+            subtitle: 'Checking GNOME Keyring…',
         });
         ctx.statusRow.add_suffix(new Gtk.Image({icon_name: 'dialog-password-symbolic'}));
         group.add(ctx.statusRow);
@@ -43,14 +51,23 @@ export default class ZaiUsagePreferences extends ExtensionPreferences {
 
         // Saves the typed key (Enter or the row's apply button), plus the
         // explicit "Save API key" button row below — there is no auto-save.
-        const saveKey = () => {
+        const saveKey = async () => {
             const v = (keyEntry.text ?? '').trim();
             keyEntry.text = '';
             if (!v)
                 return;
-            settings.set_string('api-key', v);
-            ctx.statusRow.subtitle = 'Key saved — testing connection…';
-            this._testConnection(ctx);
+            ctx.statusRow.subtitle = 'Saving key securely…';
+            try {
+                await storeApiKey(v);
+                // Remove any residue left by a previous release only after the
+                // keyring write has completed successfully.
+                settings.reset('api-key');
+                bumpCredentialGeneration(settings);
+                ctx.statusRow.subtitle = 'Key saved in GNOME Keyring — testing connection…';
+                await this._testConnection(ctx);
+            } catch (e) {
+                ctx.statusRow.subtitle = `Could not save key: ${e?.message ?? String(e)}`;
+            }
         };
         keyEntry.connect('apply', saveKey);
 
@@ -61,19 +78,22 @@ export default class ZaiUsagePreferences extends ExtensionPreferences {
 
         const envRow = new Adw.SwitchRow({
             title: `Use $${ENV_KEY} environment variable`,
-            subtitle: 'Fall back to the environment when no key is set above. Effective on the next poll.',
-        });
-        envRow.connect('notify::active', () => {
-            this._refreshStatus(ctx);
-            this._testConnection(ctx);
+            subtitle: 'Optional fallback. Environment variables are less secure than GNOME Keyring.',
         });
         settings.bind('use-env-key', envRow, 'active', Gio.SettingsBindFlags.DEFAULT);
         group.add(envRow);
 
         const clearRow = new Adw.ButtonRow({title: 'Clear stored API key'});
-        clearRow.connect('activated', () => {
-            settings.set_string('api-key', '');
-            this._refreshStatus(ctx);
+        clearRow.connect('activated', async () => {
+            ctx.statusRow.subtitle = 'Removing key from GNOME Keyring…';
+            try {
+                await clearApiKey();
+                settings.reset('api-key');
+                bumpCredentialGeneration(settings);
+                await this._refreshStatus(ctx);
+            } catch (e) {
+                ctx.statusRow.subtitle = `Could not remove key: ${e?.message ?? String(e)}`;
+            }
         });
         group.add(clearRow);
 
@@ -95,7 +115,14 @@ export default class ZaiUsagePreferences extends ExtensionPreferences {
         helpRow.set_activatable_widget(helpBtn);
         group.add(helpRow);
 
-        settings.connect('changed::api-key', () => this._refreshStatus(ctx));
+        settings.connectObject(
+            'changed::api-key', () => this._refreshStatus(ctx),
+            'changed::use-env-key', () => {
+                this._refreshStatus(ctx);
+                this._testConnection(ctx);
+            },
+            ctx.window);
+        this._refreshStatus(ctx);
     }
 
     _buildPanel(page, settings) {
@@ -152,35 +179,48 @@ export default class ZaiUsagePreferences extends ExtensionPreferences {
         group.add(win);
     }
 
-    _keyStatusText(settings) {
-        const stored = (settings.get_string('api-key') ?? '').trim();
+    async _keyStatusText(settings) {
+        await migrateLegacyApiKey(settings);
+        const stored = await lookupStoredApiKey();
         if (stored)
-            return 'Key set (from preferences).';
-        if (settings.get_boolean('use-env-key') && resolveApiKey(settings))
+            return 'Key set (protected by GNOME Keyring).';
+        if (settings.get_boolean('use-env-key') && await resolveApiKey(settings))
             return `Key set (from $${ENV_KEY}).`;
         return 'No key configured.';
     }
 
-    _refreshStatus(ctx) {
-        ctx.statusRow.subtitle = this._keyStatusText(ctx.settings);
+    async _refreshStatus(ctx) {
+        try {
+            ctx.statusRow.subtitle = await this._keyStatusText(ctx.settings);
+        } catch (e) {
+            ctx.statusRow.subtitle = `Could not access GNOME Keyring: ${e?.message ?? String(e)}`;
+        }
     }
 
     // Probes the API once so the user gets immediate confirmation the key works.
-    _testConnection(ctx) {
+    async _testConnection(ctx) {
         if (ctx.cancellable)
             ctx.cancellable.cancel();
-        const key = resolveApiKey(ctx.settings);
+        ctx.cancellable = new Gio.Cancellable();
+        const cancellable = ctx.cancellable;
+        let key;
+        try {
+            key = await resolveApiKey(ctx.settings, cancellable);
+        } catch (e) {
+            if (!cancellable.is_cancelled())
+                ctx.statusRow.subtitle = `Could not access GNOME Keyring: ${e?.message ?? String(e)}`;
+            return;
+        }
         if (!key)
             return;
-        ctx.cancellable = new Gio.Cancellable();
         const client = new ZaiClient(ctx.settings);
-        client.fetchQuota(ctx.cancellable).then(q => {
-            if (ctx.cancellable?.is_cancelled())
+        return client.fetchQuota(cancellable, key).then(q => {
+            if (cancellable.is_cancelled())
                 return;
             const pct = q.percentage != null ? `${Math.round(q.percentage)}%` : 'OK';
             ctx.statusRow.subtitle = `Connected — current usage ${pct}.`;
         }).catch(e => {
-            if (ctx.cancellable?.is_cancelled())
+            if (cancellable.is_cancelled())
                 return;
             ctx.statusRow.subtitle = `Connection failed: ${e?.message ?? String(e)}`;
         });

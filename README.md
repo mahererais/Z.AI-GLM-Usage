@@ -2,7 +2,7 @@
 
 A GNOME Shell panel indicator that shows your **Z.ai (GLM)** coding-plan token quota and live usage right in the top bar — a usage ring, a percentage, an optional reset countdown, and a label — plus a dropdown with token detail and 7-day aggregate stats. Inspired by [ClaudeCodeUsage](https://github.com/dvdstelt/ClaudeCodeUsage) and the Z.ai VS Code trackers.
 
-It polls Z.ai's monitor API with your own API key (entered once in preferences, or read from `ZAI_API_KEY`).
+It polls Z.ai's monitor API with your own API key. The key is stored in GNOME Keyring and sent only to `https://api.z.ai` for usage queries.
 
 ## Features
 
@@ -17,6 +17,7 @@ It polls Z.ai's monitor API with your own API key (entered once in preferences, 
 ## Requirements
 
 - GNOME Shell 48, 49, or 50.
+- GNOME Keyring/Secret Service with the Secret 1 typelib (`libsecret`).
 - A Z.ai API key (the same Bearer token used for the GLM API).
 
 ## Install (development)
@@ -39,8 +40,8 @@ Open preferences from the dropdown (gear) or:
 gnome-extensions prefs zai-glm-usage@karbut.github.io
 ```
 
-- **API key** — paste your Z.ai key. Stored locally by GNOME (GSettings), never sent anywhere except Z.ai.
-- **Use `ZAI_API_KEY`** — fall back to the environment variable when no key is set.
+- **API key** — paste your Z.ai key. It is protected by GNOME Keyring and sent only to `api.z.ai`.
+- **Use `ZAI_API_KEY`** — optional, disabled-by-default fallback. Process environments are less secure than the keyring.
 - **Panel label**, gauge, percentage, reset countdown, remaining-vs-used.
 - **Refresh interval** (30–600 s) and **quota window length** (for the projection).
 
@@ -50,11 +51,20 @@ gnome-extensions prefs zai-glm-usage@karbut.github.io
 
 ## Standalone validator
 
-Test the client without loading the shell:
+Test the client without loading the shell. Configure the key once in the extension preferences, then run:
 
 ```sh
-ZAI_API_KEY=... gjs -m tools/poll.js
+gjs -m tools/poll.js
 ```
+
+The validator refuses API keys passed as command-line arguments so they cannot leak through process listings or shell history.
+
+## Security
+
+- API requests are restricted to `https://api.z.ai` and never follow redirects.
+- Response bodies are limited to 1 MiB and must be JSON.
+- The extension does not spawn subprocesses, execute downloaded code, access the clipboard, or read arbitrary files.
+- Releases prior to 1.1.0 stored the key in GSettings. On first use, 1.1.0 migrates that value to GNOME Keyring and removes the plaintext setting only after a successful keyring write.
 
 ## License
 

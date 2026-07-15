@@ -19,7 +19,7 @@ export const MODEL_USAGE_URL = `${BASE_URL}/api/monitor/usage/model-usage`;
 // Where the "Usage page" button points. Z.ai exposes usage on the chat app.
 export const USAGE_DASHBOARD_URL = 'https://chat.z.ai';
 
-// Environment variable read as a convenience when no key is set in preferences.
+// Optional, lower-security fallback used when no key is stored in GNOME Keyring.
 export const ENV_KEY = 'ZAI_API_KEY';
 
 // Token-quota window the API reports the limit for. Z.ai's coding plan uses a
@@ -27,5 +27,4 @@ export const ENV_KEY = 'ZAI_API_KEY';
 // only for the burn-rate projection coloring, never for the percentage itself.
 export const DEFAULT_WINDOW_HOURS = 5;
 
-export const encoder = new TextEncoder();
 export const decoder = new TextDecoder();

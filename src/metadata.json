@@ -1,10 +1,10 @@
 {
   "uuid": "zai-glm-usage@karbut.github.io",
   "name": "Z.ai GLM Usage Monitor",
-  "description": "Shows your Z.ai (GLM) coding-plan token quota and live usage in the top bar, with a usage ring, percentage, and reset countdown. Enter your Z.ai API key in preferences (or export ZAI_API_KEY).",
+  "description": "Shows your Z.ai (GLM) coding-plan token quota and live usage in the top bar, with a usage ring, percentage, and reset countdown. API keys are protected by GNOME Keyring; an opt-in ZAI_API_KEY fallback is also available.",
   "shell-version": ["48", "49", "50"],
   "url": "https://github.com/karbut/zai-glm-usage",
   "settings-schema": "org.gnome.shell.extensions.zai-usage",
-  "version": 1,
-  "version-name": "1.0.0"
+  "version": 2,
+  "version-name": "1.1.0"
 }

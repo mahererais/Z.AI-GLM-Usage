@@ -384,6 +384,7 @@ class ZaiUsageIndicator extends PanelMenu.Button {
             'changed::show-remaining', () => this._renderPanel(),
             'changed::plan-label', () => this._applyLabel(),
             'changed::api-key', () => this._refresh(true),
+            'changed::credential-generation', () => this._refresh(true),
             'changed::use-env-key', () => this._refresh(true),
             this);
 

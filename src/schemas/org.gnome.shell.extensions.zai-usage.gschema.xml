@@ -4,13 +4,18 @@
           path="/org/gnome/shell/extensions/zai-usage/">
     <key name="api-key" type="s">
       <default>''</default>
-      <summary>Z.ai API key</summary>
-      <description>Your Z.ai Bearer token (the same key used for the GLM API). Leave empty to read ZAI_API_KEY from the environment.</description>
+      <summary>Deprecated plaintext API key</summary>
+      <description>Compatibility-only storage used to migrate old installations to GNOME Keyring. New versions never write a secret here.</description>
     </key>
     <key name="use-env-key" type="b">
-      <default>true</default>
+      <default>false</default>
       <summary>Fall back to ZAI_API_KEY env var</summary>
-      <description>When no API key is set in preferences, read it from the ZAI_API_KEY environment variable if present.</description>
+      <description>When no API key is stored in GNOME Keyring, optionally read it from ZAI_API_KEY. This is disabled by default because process environments provide weaker protection.</description>
+    </key>
+    <key name="credential-generation" type="i">
+      <default>0</default>
+      <summary>Credential change generation</summary>
+      <description>Non-secret counter used to notify the shell process that the keyring credential changed.</description>
     </key>
     <key name="plan-label" type="s">
       <default>'GLM'</default>
