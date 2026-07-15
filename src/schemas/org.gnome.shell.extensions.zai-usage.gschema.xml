@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.zai-usage"
+          path="/org/gnome/shell/extensions/zai-usage/">
+    <key name="api-key" type="s">
+      <default>''</default>
+      <summary>Z.ai API key</summary>
+      <description>Your Z.ai Bearer token (the same key used for the GLM API). Leave empty to read ZAI_API_KEY from the environment.</description>
+    </key>
+    <key name="use-env-key" type="b">
+      <default>true</default>
+      <summary>Fall back to ZAI_API_KEY env var</summary>
+      <description>When no API key is set in preferences, read it from the ZAI_API_KEY environment variable if present.</description>
+    </key>
+    <key name="plan-label" type="s">
+      <default>'GLM'</default>
+      <summary>Panel label</summary>
+      <description>Short label shown in the panel (e.g. GLM, Coding, GLM-5.2).</description>
+    </key>
+    <key name="show-icon" type="b">
+      <default>true</default>
+      <summary>Show the icon</summary>
+      <description>Display the GLM icon in the panel.</description>
+    </key>
+    <key name="panel-gauge" type="s">
+      <choices>
+        <choice value="ring"/>
+        <choice value="bar"/>
+        <choice value="none"/>
+      </choices>
+      <default>"ring"</default>
+      <summary>Panel usage gauge</summary>
+      <description>Which usage gauge to draw in the panel: a circular ring, a horizontal bar, or none.</description>
+    </key>
+    <key name="show-percentage" type="b">
+      <default>true</default>
+      <summary>Show the usage percentage</summary>
+      <description>Display the usage percentage number in the panel.</description>
+    </key>
+    <key name="show-reset" type="b">
+      <default>false</default>
+      <summary>Show the time until reset</summary>
+      <description>Display, in the panel, the time left before the token quota resets.</description>
+    </key>
+    <key name="show-remaining" type="b">
+      <default>false</default>
+      <summary>Show remaining instead of used</summary>
+      <description>Display the remaining percentage rather than the used percentage everywhere.</description>
+    </key>
+    <key name="window-hours" type="d">
+      <range min="1" max="168"/>
+      <default>5</default>
+      <summary>Quota window length (hours)</summary>
+      <description>Length of the rolling quota window in hours, used only for the burn-rate projection. The percentage and reset countdown do not depend on this.</description>
+    </key>
+    <key name="poll-seconds" type="i">
+      <range min="30" max="600"/>
+      <default>120</default>
+      <summary>Refresh interval</summary>
+      <description>How often, in seconds, to poll for updated usage.</description>
+    </key>
+  </schema>
+</schemalist>

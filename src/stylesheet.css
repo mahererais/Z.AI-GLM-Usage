@@ -1,0 +1,65 @@
+/* ---- panel ---- */
+.zu-panel { spacing: 6px; }
+.zu-panel-icon { icon-size: 16px; }
+.zu-panel-pct { font-weight: 700; font-size: 9.5pt; }
+.zu-panel-reset { font-size: 8.5pt; opacity: 0.7; }
+.zu-panel-label { font-size: 8.5pt; opacity: 0.8; }
+
+.zu-panel-bar { width: 34px; height: 6px; border-radius: 3px; background-color: rgba(255,255,255,0.14); }
+.zu-panel-bar-fill { height: 6px; border-radius: 3px; }
+.zu-panel-bar-fill.zu-ok { background-color: #33d17a; }
+.zu-panel-bar-fill.zu-warn { background-color: #ff7800; }
+.zu-panel-bar-fill.zu-crit { background-color: #e01b24; }
+
+.zu-panel-pct.zu-ok { color: inherit; }
+.zu-panel-pct.zu-warn { color: #ff7800; }
+.zu-panel-pct.zu-crit { color: #e01b24; }
+
+/* ---- popup ---- */
+.zu-popup { padding: 6px 4px; width: 360px; spacing: 8px; }
+
+.zu-header { spacing: 10px; }
+.zu-logo { icon-size: 28px; }
+.zu-title { font-weight: 800; font-size: 12pt; }
+.zu-subtitle { font-size: 9pt; opacity: 0.7; }
+.zu-pill {
+    background-color: rgba(255,255,255,0.12);
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 8.5pt;
+    font-weight: 700;
+}
+
+.zu-section { font-size: 8pt; font-weight: 700; opacity: 0.55; margin-top: 6px; letter-spacing: 0.06em; }
+
+.zu-meter { spacing: 4px; }
+.zu-meter-row { spacing: 8px; }
+.zu-meter-name { font-weight: 600; }
+.zu-meter-pct { font-weight: 700; }
+
+.zu-track { height: 8px; border-radius: 4px; background-color: rgba(255,255,255,0.14); }
+.zu-fill { height: 8px; border-radius: 4px; }
+.zu-fill.zu-ok { background-color: #33d17a; }
+.zu-fill.zu-warn { background-color: #ff7800; }
+.zu-fill.zu-crit { background-color: #e01b24; }
+
+.zu-caption { font-size: 8.5pt; opacity: 0.75; }
+.zu-stats { font-size: 9pt; opacity: 0.8; }
+.zu-error { color: #e01b24; font-size: 9pt; }
+
+.zu-actions { spacing: 8px; margin-top: 4px; }
+.zu-btn {
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-weight: 700;
+}
+.zu-btn-pri { background-color: #3584e4; color: #fff; }
+
+.zu-footer { spacing: 8px; margin-top: 6px; }
+.zu-updated { font-size: 8.5pt; opacity: 0.6; }
+.zu-refresh {
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-size: 9pt;
+    background-color: rgba(255,255,255,0.1);
+}
