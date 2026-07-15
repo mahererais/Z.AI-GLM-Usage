@@ -1,5 +1,7 @@
 # Z.ai GLM Usage Monitor
 
+![Otter Solutions usage monitor icon](src/icons/otter-solutions-usage.png)
+
 A GNOME Shell panel indicator that shows your **Z.ai (GLM)** coding-plan token quota and live usage right in the top bar — a usage ring, a percentage, an optional reset countdown, and a label — plus a dropdown with token detail and 7-day aggregate stats. Inspired by [ClaudeCodeUsage](https://github.com/dvdstelt/ClaudeCodeUsage) and the Z.ai VS Code trackers.
 
 It polls Z.ai's monitor API with your own API key. The key is stored in GNOME Keyring and sent only to `https://api.z.ai` for usage queries.

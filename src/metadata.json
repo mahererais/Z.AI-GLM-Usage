@@ -5,6 +5,6 @@
   "shell-version": ["48", "49", "50"],
   "url": "https://github.com/karbut/zai-glm-usage",
   "settings-schema": "org.gnome.shell.extensions.zai-usage",
-  "version": 2,
-  "version-name": "1.1.0"
+  "version": 3,
+  "version-name": "1.2.0"
 }
