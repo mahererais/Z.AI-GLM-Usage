@@ -24,20 +24,15 @@ if [[ -n "$bump" ]]; then
     -patch) patch=$((patch+1)) ;;
   esac
   new_name="$major.$minor.$patch"
-  ver="$(python3 -c "import json;d=json.load(open('$META'));print(int(d.get('version',0))+1)")"
-  python3 - "$META" "$new_name" "$ver" <<'PY'
+  python3 - "$META" "$new_name" <<'PY'
 import json, sys
-path, name, ver = sys.argv[1], sys.argv[2], sys.argv[3]
+path, name = sys.argv[1], sys.argv[2]
 d = json.load(open(path))
 d['version-name'] = name
-d['version'] = int(ver)
 json.dump(d, open(path, 'w'), indent=2)
 PY
-  echo "Bumped to $new_name (version $ver)"
+  echo "Bumped to $new_name"
 fi
-
-# Make sure the schema is compiled in-tree before packing.
-glib-compile-schemas "$SRC/schemas/"
 
 uuid="$(python3 -c "import json;print(json.load(open('$META'))['uuid'])")"
 rm -rf "$DIST"

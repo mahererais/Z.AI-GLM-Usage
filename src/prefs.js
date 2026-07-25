@@ -115,13 +115,21 @@ export default class ZaiUsagePreferences extends ExtensionPreferences {
         helpRow.set_activatable_widget(helpBtn);
         group.add(helpRow);
 
-        settings.connectObject(
-            'changed::api-key', () => this._refreshStatus(ctx),
-            'changed::use-env-key', () => {
+        // Gio.Settings in the standalone preferences process does not provide
+        // GObject.Object.connectObject(). Keep the signal IDs so they can be
+        // disconnected when the preferences window goes away.
+        const signalIds = [
+            settings.connect('changed::api-key', () => this._refreshStatus(ctx)),
+            settings.connect('changed::use-env-key', () => {
                 this._refreshStatus(ctx);
                 this._testConnection(ctx);
-            },
-            ctx.window);
+            }),
+        ];
+        ctx.window.connect('destroy', () => {
+            ctx.cancellable?.cancel();
+            for (const signalId of signalIds)
+                settings.disconnect(signalId);
+        });
         this._refreshStatus(ctx);
     }
 

@@ -3,13 +3,17 @@ import Secret from 'gi://Secret?version=1';
 
 import {ENV_KEY} from './config.js';
 
-const API_KEY_SCHEMA = new Secret.Schema(
-    'io.github.karbut.ZaiUsage.ApiKey',
-    Secret.SchemaFlags.NONE,
-    {account: Secret.SchemaAttributeType.STRING});
-
 const API_KEY_ATTRIBUTES = {account: 'default'};
 const API_KEY_LABEL = 'Z.ai GLM Usage Monitor API key';
+
+// This creates a libsecret object only when the extension is already enabled
+// and needs to access the keyring. Module initialization must stay static.
+function apiKeySchema() {
+    return new Secret.Schema(
+        'io.github.karbut.ZaiUsage.ApiKey',
+        Secret.SchemaFlags.NONE,
+        {account: Secret.SchemaAttributeType.STRING});
+}
 
 function finishAsync(start, finish) {
     return new Promise((resolve, reject) => {
@@ -26,7 +30,7 @@ function finishAsync(start, finish) {
 export function lookupStoredApiKey(cancellable = null) {
     return finishAsync(
         callback => Secret.password_lookup(
-            API_KEY_SCHEMA, API_KEY_ATTRIBUTES, cancellable, callback),
+            apiKeySchema(), API_KEY_ATTRIBUTES, cancellable, callback),
         (_source, result) => (Secret.password_lookup_finish(result) ?? '').trim() || null);
 }
 
@@ -37,7 +41,7 @@ export function storeApiKey(apiKey, cancellable = null) {
 
     return finishAsync(
         callback => Secret.password_store(
-            API_KEY_SCHEMA,
+            apiKeySchema(),
             API_KEY_ATTRIBUTES,
             Secret.COLLECTION_DEFAULT,
             API_KEY_LABEL,
@@ -54,7 +58,7 @@ export function storeApiKey(apiKey, cancellable = null) {
 export function clearApiKey(cancellable = null) {
     return finishAsync(
         callback => Secret.password_clear(
-            API_KEY_SCHEMA, API_KEY_ATTRIBUTES, cancellable, callback),
+            apiKeySchema(), API_KEY_ATTRIBUTES, cancellable, callback),
         (_source, result) => Secret.password_clear_finish(result));
 }
 
