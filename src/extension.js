@@ -666,6 +666,7 @@ class ZaiUsageIndicator extends PanelMenu.Button {
         this._ring = null;
         this._panelReset = null;
         this._lastUsage = null;
+        this._client?.destroy();
         this._client = null;
 
         super.destroy();

@@ -1,9 +1,6 @@
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
-// Pin Soup 3.0 inline: some systems still have the 2.4 typelib installed, and
-// without a version the prefs process (where the shell hasn't already loaded
-// Soup) could pick the wrong one.
-import Soup from 'gi://Soup?version=3.0';
+import Soup from 'gi://Soup';
 
 import {BASE_URL, QUOTA_URL, MODEL_USAGE_URL, decoder} from './config.js';
 import {resolveApiKey, apiKeyAvailable} from './secretStore.js';
@@ -43,6 +40,10 @@ export class ZaiClient {
         this._settings = settings;
         this._session = new Soup.Session();
         this._session.timeout = 15;
+    }
+
+    destroy() {
+        this._session.abort();
     }
 
     // Low-level JSON request. `token` is sent as a Bearer header, which both

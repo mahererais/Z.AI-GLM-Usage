@@ -1,5 +1,5 @@
 import GLib from 'gi://GLib';
-import Secret from 'gi://Secret?version=1';
+import Secret from 'gi://Secret';
 
 import {ENV_KEY} from './config.js';
 
