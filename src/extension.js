@@ -18,6 +18,8 @@ const TRACK_WIDTH = 300;
 const RING_SIZE = 18;
 const RING_WIDTH = 3;
 const PANEL_BAR_WIDTH = 34;
+// Rolling window of the secondary (weekly) credit limit, for severity math.
+const WEEK_WINDOW_SECONDS = 7 * 24 * 3600;
 
 // Severity levels, least to most severe.
 const LEVEL_RANK = {ok: 0, warn: 1, crit: 2};
@@ -343,6 +345,7 @@ class ZaiUsageIndicator extends PanelMenu.Button {
         this._openPreferences = openPreferences;
         this._client = new ZaiClient(settings);
         this._busy = false;
+        this._hasWeekly = false;
         this._cancellable = new Gio.Cancellable();
         this._lastUsage = null;
         this._lastFetchMs = 0;
@@ -358,12 +361,16 @@ class ZaiUsageIndicator extends PanelMenu.Button {
         this._ring = new Ring();
         this._panelBar = new PanelBar();
         this._panelPct = new St.Label({text: '…', style_class: 'zu-panel-pct', y_align: Clutter.ActorAlign.CENTER});
+        this._ringWeek = new Ring();
+        this._panelPctWeek = new St.Label({text: '', style_class: 'zu-panel-pct', y_align: Clutter.ActorAlign.CENTER});
         this._panelReset = new St.Label({text: '', style_class: 'zu-panel-reset', y_align: Clutter.ActorAlign.CENTER});
         this._panelLabel = new St.Label({text: '', style_class: 'zu-panel-label', y_align: Clutter.ActorAlign.CENTER});
         box.add_child(this._panelIcon);
         box.add_child(this._ring);
         box.add_child(this._panelBar.root);
         box.add_child(this._panelPct);
+        box.add_child(this._ringWeek);
+        box.add_child(this._panelPctWeek);
         box.add_child(this._panelReset);
         box.add_child(this._panelLabel);
         this.add_child(box);
@@ -412,6 +419,10 @@ class ZaiUsageIndicator extends PanelMenu.Button {
         this._ring.visible = gauge === 'ring';
         this._panelBar.root.visible = gauge === 'bar';
         this._panelPct.visible = this._settings.get_boolean('show-percentage');
+        // The weekly ring/percentage only make sense in ring mode with data.
+        this._ringWeek.visible = gauge === 'ring' && this._hasWeekly;
+        this._panelPctWeek.visible = gauge === 'ring' && this._hasWeekly &&
+            this._settings.get_boolean('show-percentage');
         this._panelReset.visible = this._settings.get_boolean('show-reset');
         this._panelLabel.visible = !!this._settings.get_string('plan-label')?.trim();
     }
@@ -452,9 +463,11 @@ class ZaiUsageIndicator extends PanelMenu.Button {
         root.add_child(header);
 
         // quota section
-        this._sectionLabel(root, 'Token quota');
-        this._quota = new Meter('Token quota');
+        this._sectionLabel(root, 'Usage quota');
+        this._quota = new Meter('5-hour window');
         root.add_child(this._quota.root);
+        this._quotaWeek = new Meter('Weekly window');
+        root.add_child(this._quotaWeek.root);
 
         this._stats = wrapLabel(new St.Label({text: '', style_class: 'zu-stats'}));
         root.add_child(this._stats);
@@ -534,14 +547,30 @@ class ZaiUsageIndicator extends PanelMenu.Button {
         if (note)
             caption = caption ? `${caption} · ${note}` : note;
 
-        // Token detail under the bar: used / limit.
+        // Detail under the bar: used / limit, in tokens or plan credits.
+        const unitLabel = q.unit === 'credits' ? 'credits' : 'tokens';
         const usedStr = formatTokens(q.used);
         const limitStr = formatTokens(q.limit);
         const tokDetail = (q.used != null || q.limit != null)
-            ? `${usedStr}${q.limit != null ? ` / ${limitStr} tokens` : ' tokens used'}`
+            ? `${usedStr}${q.limit != null ? ` / ${limitStr} ${unitLabel}` : ` ${unitLabel} used`}`
             : '';
         this._quota.setValue(this._displayUtil(usedUtil),
             [caption, tokDetail].filter(Boolean).join(' · ') || null, level);
+
+        // Secondary rolling window (weekly credits on coding plans).
+        const w = q.weekly;
+        if (w && w.percentage != null) {
+            this._quotaWeek.root.visible = true;
+            const wDetail = (w.used != null || w.limit != null)
+                ? `${formatTokens(w.used)}${w.limit != null ? ` / ${formatTokens(w.limit)} ${unitLabel}` : ` ${unitLabel} used`}`
+                : '';
+            const wReset = w.resetsAt ? relativeReset(w.resetsAt) : '';
+            const wCaption = [wDetail, wReset].filter(Boolean).join(' · ');
+            const wLevel = windowLevel(w.percentage, w.resetsAt, WEEK_WINDOW_SECONDS);
+            this._quotaWeek.setValue(this._displayUtil(w.percentage), wCaption || null, wLevel);
+        } else {
+            this._quotaWeek.root.visible = false;
+        }
 
         // 7-day aggregate stats line.
         if (usage.sevenDay) {
@@ -605,6 +634,8 @@ class ZaiUsageIndicator extends PanelMenu.Button {
             this._ring.setUnknown();
             this._panelBar.setUnknown();
             this._panelReset.text = '';
+            this._hasWeekly = false;
+            this._applyVisibility();
             return;
         }
         const usedUtil = q.percentage;
@@ -614,6 +645,22 @@ class ZaiUsageIndicator extends PanelMenu.Button {
         this._panelReset.text = q.resetsAt ? compactReset(q.resetsAt) : '';
         this._ring.setValue(this._displayUtil(usedUtil), level);
         this._panelBar.setValue(this._displayUtil(usedUtil), level);
+
+        // Secondary rolling window (e.g. weekly credits) gets its own ring,
+        // with severity computed over its own (7-day) window.
+        const w = q.weekly;
+        this._hasWeekly = !!(w && w.percentage != null);
+        if (this._hasWeekly) {
+            const wUtil = w.percentage;
+            const wLevel = windowLevel(wUtil, w.resetsAt, WEEK_WINDOW_SECONDS);
+            this._ringWeek.setValue(this._displayUtil(wUtil), wLevel);
+            this._panelPctWeek.text = `${Math.round(this._displayUtil(wUtil))}%`;
+            this._panelPctWeek.style_class = `zu-panel-pct ${levelClass(wLevel)}`;
+        } else {
+            this._ringWeek.setUnknown();
+            this._panelPctWeek.text = '';
+        }
+        this._applyVisibility();
     }
 
     _renderError(e) {
@@ -628,6 +675,8 @@ class ZaiUsageIndicator extends PanelMenu.Button {
         this._panelPct.style_class = 'zu-panel-pct zu-warn';
         this._ring.setUnknown();
         this._panelBar.setUnknown();
+        this._ringWeek.setUnknown();
+        this._panelPctWeek.text = '';
         this._panelReset.text = '';
         let msg;
         if (e instanceof UsageError && (e.status === 401 || e.status === 403))
@@ -639,6 +688,7 @@ class ZaiUsageIndicator extends PanelMenu.Button {
         this._error.text = msg;
         this._error.visible = true;
         this._stats.visible = false;
+        this._quotaWeek.setMuted();
         this._quota.setMuted();
         this._updated.text = 'Update failed';
         logError(e, 'zai-usage: refresh failed');
@@ -660,10 +710,14 @@ class ZaiUsageIndicator extends PanelMenu.Button {
         this._settings = null;
 
         this._quota?.destroy();
+        this._quotaWeek?.destroy();
         this._panelBar?.destroy();
         this._quota = null;
+        this._quotaWeek = null;
         this._panelBar = null;
         this._ring = null;
+        this._ringWeek = null;
+        this._panelPctWeek = null;
         this._panelReset = null;
         this._lastUsage = null;
         this._client?.destroy();
