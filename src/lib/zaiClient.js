@@ -141,11 +141,39 @@ export class ZaiClient {
         return key;
     }
 
-    // The primary quota window, normalized to the shape the UI expects. The
-    // raw payload is { success, data: { limits: [ { type, percentage,
-    // currentValue, usage, nextResetTime }, ... ] } }; we surface the
-    // TOKENS_LIMIT entry. nextResetTime is a Unix-ms timestamp and is
-    // converted to an ISO string for the UI's countdown helpers.
+    // Normalize one raw limit entry into the shape the UI expects. The raw
+    // payload is { type, percentage, currentValue, usage, nextResetTime }.
+    // The field that holds the limit cap is named "usage" in the payload
+    // (confusingly); accept a plain "limit" too in case the schema shifts.
+    // nextResetTime is a Unix-ms timestamp, converted to an ISO string for the
+    // UI's countdown helpers.
+    _normalizeLimit(l) {
+        if (!l)
+            return null;
+        const resetMs = Number(l.nextResetTime) || 0;
+        const used = l.currentValue != null ? Number(l.currentValue) : null;
+        const limit = l.usage != null ? Number(l.usage)
+            : l.limit != null ? Number(l.limit) : null;
+        let percentage = l.percentage != null ? Number(l.percentage) : null;
+        // If the API omits a percentage but gives used/limit, derive it.
+        if ((percentage == null || Number.isNaN(percentage)) && used != null && limit)
+            percentage = (used / limit) * 100;
+        if (percentage != null)
+            percentage = Math.max(0, Math.min(100, percentage));
+        return {
+            percentage,
+            used,
+            limit,
+            resetsAt: resetMs > 0 ? new Date(resetMs).toISOString() : null,
+        };
+    }
+
+    // The primary quota window, normalized to the shape the UI expects. Two
+    // payload shapes are supported:
+    //  - Legacy: a single TOKENS_LIMIT entry tracking raw tokens.
+    //  - Coding plan (credits, e.g. Lite): several CREDIT_LIMIT entries, one
+    //    per rolling window (5-hour, weekly). The shortest window drives the
+    //    panel ring; the longest is surfaced as `weekly` for the popup.
     async fetchQuota(cancellable = null, apiKey = null) {
         const key = apiKey ?? await this._key(cancellable);
         const data = await this._request('GET', QUOTA_URL, {token: key, cancellable});
@@ -157,26 +185,37 @@ export class ZaiClient {
 
         const limits = data.data?.limits;
         const arr = Array.isArray(limits) ? limits : [];
-        const token = arr.find(l => l && l.type === 'TOKENS_LIMIT') ?? null;
-        const resetMs = Number(token?.nextResetTime) || 0;
+        const legacy = arr.find(l => l && l.type === 'TOKENS_LIMIT') ?? null;
+        const credits = arr
+            .filter(l => l && l.type === 'CREDIT_LIMIT')
+            .map(l => ({entry: this._normalizeLimit(l), reset: Number(l.nextResetTime) || 0}))
+            .filter(c => c.entry && (c.entry.percentage != null || c.entry.used != null))
+            .sort((a, b) => a.reset - b.reset);
 
-        const used = token?.currentValue != null ? Number(token.currentValue) : null;
-        // The field that holds the limit cap is named "usage" in the payload
-        // (confusingly); accept a plain "limit" too in case the schema shifts.
-        const limit = token?.usage != null ? Number(token.usage)
-            : token?.limit != null ? Number(token.limit) : null;
-        let percentage = token?.percentage != null ? Number(token.percentage) : null;
-        // If the API omits a percentage but gives used/limit, derive it.
-        if ((percentage == null || Number.isNaN(percentage)) && used != null && limit)
-            percentage = (used / limit) * 100;
-        if (percentage != null)
-            percentage = Math.max(0, percentage);
+        const primary = legacy
+            ? {...this._normalizeLimit(legacy), unit: 'tokens'}
+            : credits.length
+                ? {...credits[0].entry, unit: 'credits'}
+                : null;
+        if (!primary)
+            return {percentage: null, used: null, limit: null, resetsAt: null,
+                unit: 'tokens', weekly: null};
+
+        // Longest credit window (e.g. the weekly one) for the popup detail.
+        let weekly = null;
+        if (!legacy && credits.length > 1) {
+            const w = credits[credits.length - 1].entry;
+            weekly = {percentage: w.percentage, used: w.used, limit: w.limit,
+                resetsAt: w.resetsAt};
+        }
 
         return {
-            percentage,
-            used,
-            limit,
-            resetsAt: resetMs > 0 ? new Date(resetMs).toISOString() : null,
+            percentage: primary.percentage,
+            used: primary.used,
+            limit: primary.limit,
+            resetsAt: primary.resetsAt,
+            unit: primary.unit,
+            weekly,
         };
     }
 
